@@ -14,6 +14,7 @@ struct XDiptychApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .preferredColorScheme(.dark) // Set preferred color scheme
         }
     }
 }

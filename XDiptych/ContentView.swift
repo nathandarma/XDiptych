@@ -7,6 +7,7 @@
 
 import SwiftUI
 import PhotosUI // Import PhotosUI
+import UIKit // Ensure UIKit is imported for UIColor and potentially UIImageWriteToSavedPhotosAlbum if not transitively
 
 enum AspectRatioOption: String, CaseIterable, Identifiable {
     case square = "1:1"
@@ -30,6 +31,13 @@ struct ContentView: View {
     // Removed old state variables for individual images and photo items
     @State private var diptychImage: UIImage?
     @State private var selectedAspectRatio: AspectRatioOption = .square
+    // Frame customization state variables
+    @State private var frameColor: Color = .black // Default to black for dark theme
+    @State private var frameThickness: CGFloat = 0.0
+    // State for save feedback
+    @State private var showSaveConfirmation = false
+    @State private var saveMessage = ""
+    @State private var imageSaver = ImageSaver() // Instance of the helper
     @State private var showPicker1 = false // To control first picker presentation
     @State private var showPicker2 = false // To control second picker presentation
 
@@ -38,60 +46,122 @@ struct ContentView: View {
     @State private var adjImage2 = AdjustableImage()
 
     var body: some View {
-        // Main VStack
-        VStack {
-            // Top row of buttons for image selection
-            HStack {
-                Button("Select Image 1") {
-                    showPicker1 = true
-                }
-                Spacer() // Pushes buttons to the sides
-                Button("Select Image 2") {
-                    showPicker2 = true
-                }
-            }
-            .padding(.horizontal) // Padding for the button row
+        ZStack { // Use ZStack to layer background
+            Color.black.edgesIgnoringSafeArea(.all) // Dark background
 
-            // HStack for the two interactive image views
-            HStack(spacing: 2) { // spacing: 2 for a small gap, 0 for touching borders
-                InteractiveImageView(adjustableImage: $adjImage1)
-                InteractiveImageView(adjustableImage: $adjImage2)
-            }
-            .frame(height: 300) // Define a height for the interactive area
-            .padding(.horizontal) // Padding for the interactive image area
+            ScrollView { // Ensure content is scrollable
+                VStack { // Main content VStack
+                    // 1. Interactive Image Previews
+                    HStack(spacing: 2) {
+                        InteractiveImageView(adjustableImage: $adjImage1)
+                        InteractiveImageView(adjustableImage: $adjImage2)
+                    }
+                    .frame(height: 300)
+                    .padding(.vertical)
 
-            // Display area for the final processed diptych (output of ImageProcessor)
-            // This is intentionally kept separate to show that live adjustments
-            // in InteractiveImageView are now reflected in the final diptych by ImageProcessor.
-            Group {
-                Text("Final Diptych Preview:").font(.caption).padding(.top) // Updated text
-                if let diptych = diptychImage {
-                    Image(uiImage: diptych)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxHeight: 150)
-                        .border(Color.black, width: 1) // Updated border
-                } else {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.05))
-                        .frame(maxWidth: .infinity, maxHeight: 150)
-                        .overlay(Text("Final Diptych").foregroundColor(.gray)) // Updated text
-                        .border(Color.gray.opacity(0.5))
-                }
-            }
-            .padding(.horizontal)
+                    // 2. Control Panel (Form)
+                    Form {
+                        Section(header: Text("Image Selection").foregroundColor(.gray)) {
+                            Button { showPicker1 = true } label: {
+                                Label("Select Image 1", systemImage: "photo.on.rectangle.angled")
+                                    .padding(.vertical, 6)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                            }
+                            .buttonStyle(.bordered)
+                            // .tint(.gray) // Using default tint for bordered in dark mode often works well
 
-            Picker("Aspect Ratio", selection: $selectedAspectRatio) {
-                ForEach(AspectRatioOption.allCases) { option in
-                    Text(option.rawValue).tag(option)
-                }
-            }
-            .padding() // Added padding for visual separation
+                            Button { showPicker2 = true } label: {
+                                Label("Select Image 2", systemImage: "photo.on.rectangle.angled")
+                                    .padding(.vertical, 6)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                            }
+                            .buttonStyle(.bordered)
+                            // .tint(.gray)
+                        }
 
-            Spacer() // Pushes content to the top
+                        Section(header: Text("Diptych Settings").foregroundColor(.gray)) {
+                            Picker("Aspect Ratio", selection: $selectedAspectRatio) {
+                                ForEach(AspectRatioOption.allCases) { option in
+                                    Text(option.rawValue).tag(option)
+                                }
+                            }
+                            // .pickerStyle(.segmented) // Consider for fewer options
+                        }
+
+                        Section(header: Text("Frame Settings").foregroundColor(.gray)) {
+                            ColorPicker("Frame Color", selection: $frameColor)
+                            VStack(alignment: .leading) {
+                                Text("Frame Thickness: \(frameThickness, specifier: "%.0f") pts")
+                                Slider(value: $frameThickness, in: 0...50, step: 1)
+                            }
+                        }
+
+                        // Save Button inside the Form for grouping
+                        Section {
+                             Button(action: {
+                                if let imageToSave = diptychImage {
+                                    imageSaver.successHandler = {
+                                        self.saveMessage = "Image saved successfully!"
+                                        self.showSaveConfirmation = true
+                                    }
+                                    imageSaver.errorHandler = { error in
+                                        self.saveMessage = "Error saving image: \(error?.localizedDescription ?? "Unknown error")"
+                                        self.showSaveConfirmation = true
+                                    }
+                                    imageSaver.writeToPhotoAlbum(image: imageToSave)
+                                }
+                            }) {
+                                Label("Save Diptych", systemImage: "square.and.arrow.down")
+                                    .fontWeight(.semibold)
+                                    .padding(.horizontal, 12) // Adjusted padding
+                                    .padding(.vertical, 10)  // Adjusted padding
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.accentColor) // Use accent color
+                                    .foregroundColor(.white)
+                                    .cornerRadius(8)
+                            }
+                            // .buttonStyle(.borderedProminent) // Removed to use custom styling
+                            .disabled(diptychImage == nil)
+                            .listRowInsets(EdgeInsets()) // Attempt to make button background extend to edges if needed
+                        }
+                    }
+                    .frame(maxHeight: 450) // Give Form a reasonable maxHeight; ScrollView handles overflow
+                    .background(Color.black) // Ensure Form background is dark if it defaults otherwise
+                    .scrollContentBackground(.hidden) // For iOS 16+, to make Form background transparent if needed
+
+
+                    // 3. Final Diptych Preview
+                    Group {
+                        Text("Final Diptych Preview:")
+                            .font(.headline) // Make it a bit more prominent
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(.top)
+                        if let diptych = diptychImage {
+                            Image(uiImage: diptych)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxHeight: 200) // Slightly larger preview if space allows
+                                .border(Color.gray, width: 1)
+                        } else {
+                            Rectangle()
+                                .fill(Color(white: 0.15))
+                                .frame(maxWidth: .infinity, maxHeight: 200)
+                                .overlay(Text("Final Diptych").foregroundColor(.white.opacity(0.7)))
+                                .border(Color.gray.opacity(0.5))
+                        }
+                    }
+                    .padding(.vertical)
+
+                    Spacer() // Pushes content up if ScrollView is not full
+                } // End of Main VStack
+                .padding(.horizontal) // Add horizontal padding to the main VStack content
+            } // End of ScrollView
+        } // End of ZStack
+        .alert(isPresented: $showSaveConfirmation) {
+            Alert(title: Text("Save Status"), message: Text(saveMessage), dismissButton: .default(Text("OK")))
         }
-        .photosPicker(isPresented: $showPicker1, selection: $adjImage1.photosItem, matching: .images) // Bind to adjImage1.photosItem
-        .photosPicker(isPresented: $showPicker2, selection: $adjImage2.photosItem, matching: .images) // Bind to adjImage2.photosItem
+        .photosPicker(isPresented: $showPicker1, selection: $adjImage1.photosItem, matching: .images)
+        .photosPicker(isPresented: $showPicker2, selection: $adjImage2.photosItem, matching: .images)
         .onChange(of: adjImage1.photosItem) { _ in
             Task {
                 if let photosItem = adjImage1.photosItem,
@@ -120,10 +190,12 @@ struct ContentView: View {
         }
         // Removed onChange(of: selectedImage1) and selectedImage2 as they are now part of adjImageX
         .onChange(of: selectedAspectRatio) { _ in generateDiptych() }
-        .onChange(of: adjImage1.scale) { _ in generateDiptych() } // Added for scale/offset
+        .onChange(of: adjImage1.scale) { _ in generateDiptych() }
         .onChange(of: adjImage1.offset) { _ in generateDiptych() }
         .onChange(of: adjImage2.scale) { _ in generateDiptych() }
         .onChange(of: adjImage2.offset) { _ in generateDiptych() }
+        .onChange(of: frameColor) { _ in generateDiptych() } // Added for frame color
+        .onChange(of: frameThickness) { _ in generateDiptych() } // Added for frame thickness
         .onAppear {
             generateDiptych()
         }
@@ -138,11 +210,14 @@ struct ContentView: View {
         }
 
         // Consider performing on a background thread for real apps
+        let uiColor = UIColor(self.frameColor) // Convert SwiftUI Color to UIColor
         self.diptychImage = ImageProcessor.createDiptych(
-            adjImage1: self.adjImage1, // Pass the full struct
-            adjImage2: self.adjImage2, // Pass the full struct
+            adjImage1: self.adjImage1,
+            adjImage2: self.adjImage2,
             targetAspectRatio: selectedAspectRatio.ratioValue,
-            outputHeight: 1200 // Default height, can be configurable later
+            frameColor: uiColor,
+            frameThickness: self.frameThickness,
+            outputHeight: 1200
         )
     }
 }
@@ -161,52 +236,91 @@ private struct InteractiveImageView: View {
     @State private var committedDragOffset: CGSize = .zero
     @State private var committedScale: CGFloat = 1.0
 
+    // Gesture state for visual cues
+    @GestureState private var isDragging: Bool = false
+    @GestureState private var isMagnifying: Bool = false
+
     var body: some View {
+        let isActive = isDragging || isMagnifying
         GeometryReader { geometry in
-            if let img = adjustableImage.image {
-                Image(uiImage: img)
-                    .resizable()
-                    .scaledToFill()
+            ZStack { // Use ZStack to allow overlaying the reset button
+                if let img = adjustableImage.image {
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .scaleEffect(committedScale * currentMagnification)
+                        .offset(x: committedDragOffset.width + currentDragOffset.width,
+                                y: committedDragOffset.height + currentDragOffset.height)
+                        .clipped()
+                        .border(isActive ? Color.accentColor : Color.gray, width: isActive ? 2 : 1) // Conditional border
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture()
+                                .updating($isDragging) { value, state, transaction in
+                                    state = true
+                                }
+                                .onChanged { value in
+                                    currentDragOffset = value.translation
+                                }
+                                .onEnded { value in
+                                    committedDragOffset.width += value.translation.width
+                                    committedDragOffset.height += value.translation.height
+                                    adjustableImage.offset = committedDragOffset
+                                    currentDragOffset = .zero
+                                }
+                        )
+                        .gesture(
+                            MagnificationGesture()
+                                .updating($isMagnifying) { value, state, transaction in
+                                    state = true
+                                }
+                                .onChanged { value in
+                                    currentMagnification = value
+                                }
+                                .onEnded { value in
+                                    committedScale *= value
+                                    committedScale = max(0.5, min(committedScale, 3.0))
+                                    adjustableImage.scale = committedScale
+                                    currentMagnification = 1.0
+                                }
+                        )
+                } else {
+                    Rectangle()
+                        .fill(Color(white: 0.15))
                     .frame(width: geometry.size.width, height: geometry.size.height)
-                    .scaleEffect(committedScale * currentMagnification)
-                    .offset(x: committedDragOffset.width + currentDragOffset.width,
-                            y: committedDragOffset.height + currentDragOffset.height)
-                    .clipped()
                     .border(Color.gray)
-                    .contentShape(Rectangle()) // For gesture hit testing
-                    .gesture(
-                        DragGesture()
-                            .onChanged { value in
-                                currentDragOffset = value.translation
+                    .overlay(Text("Select Image").foregroundColor(.white.opacity(0.7)))
+                }
+
+                // Reset Button Overlay
+                if adjustableImage.image != nil && (adjustableImage.scale != 1.0 || adjustableImage.offset != .zero || committedScale != 1.0 || committedDragOffset != .zero) {
+                    VStack {
+                        HStack {
+                            Spacer() // Pushes button to the trailing edge
+                            Button {
+                                adjustableImage.scale = 1.0
+                                adjustableImage.offset = .zero
+                                // Explicitly reset internal gesture states
+                                committedScale = 1.0
+                                currentMagnification = 1.0
+                                committedDragOffset = .zero
+                                currentDragOffset = .zero
+                            } label: {
+                                Image(systemName: "arrow.counterclockwise.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(Color.accentColor)
+                                    .padding(6) // Reduced padding
+                                    .background(Color.black.opacity(0.6))
+                                    .clipShape(Circle())
                             }
-                            .onEnded { value in
-                                committedDragOffset.width += value.translation.width
-                                committedDragOffset.height += value.translation.height
-                                adjustableImage.offset = committedDragOffset // Update binding
-                                currentDragOffset = .zero // Reset temporary offset
-                            }
-                    )
-                    .gesture(
-                        MagnificationGesture()
-                            .onChanged { value in
-                                currentMagnification = value
-                            }
-                            .onEnded { value in
-                                committedScale *= value
-                                // Clamp the scale
-                                committedScale = max(0.5, min(committedScale, 3.0))
-                                adjustableImage.scale = committedScale // Update binding
-                                currentMagnification = 1.0 // Reset temporary magnification
-                            }
-                    )
-            } else {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.1))
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .border(Color.gray)
-                    .overlay(Text("Select Image").foregroundColor(.gray))
-            }
-        }
+                            .padding(8) // Padding for the button from the corner
+                        }
+                        Spacer() // Pushes button to the top edge
+                    }
+                }
+            } // End of ZStack for overlay
+        } // End of GeometryReader
         // This onChange is important to reset gesture states when a new image is selected
         // and adjImage.scale is programmatically reset to 1.0
         .onChange(of: adjustableImage.image) { _ in // if image changes, reset internal gesture states
