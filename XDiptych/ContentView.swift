@@ -32,7 +32,7 @@ struct ContentView: View {
     @State private var diptychImage: UIImage?
     @State private var selectedAspectRatio: AspectRatioOption = .square
     // Frame customization state variables
-    @State private var frameColor: Color = .black // Default to black for dark theme
+    @State private var frameColor: Color = .gray // Default to gray for light theme
     @State private var frameThickness: CGFloat = 0.0
     // State for save feedback
     @State private var showSaveConfirmation = false
@@ -47,7 +47,7 @@ struct ContentView: View {
 
     var body: some View {
         ZStack { // Use ZStack to layer background
-            Color.black.edgesIgnoringSafeArea(.all) // Dark background
+            // Color.black.edgesIgnoringSafeArea(.all) // Removed for light theme
 
             ScrollView { // Ensure content is scrollable
                 VStack { // Main content VStack
@@ -58,42 +58,43 @@ struct ContentView: View {
                     }
                     .frame(height: 300)
                     .padding(.vertical)
+                    .padding(.bottom, 20) // Increased spacing
 
                     // 2. Control Panel (Form)
                     Form {
-                        Section(header: Text("Image Selection").foregroundColor(.gray)) {
+                        Section(header: Text("Image Selection").foregroundColor(.primary)) { // Adjusted for light theme
                             Button { showPicker1 = true } label: {
                                 Label("Select Image 1", systemImage: "photo.on.rectangle.angled")
-                                    .padding(.vertical, 6)
+                                    .padding(.vertical, 8) // Standardized padding
                                     .frame(maxWidth: .infinity, alignment: .center)
                             }
-                            .buttonStyle(.bordered)
-                            // .tint(.gray) // Using default tint for bordered in dark mode often works well
+                            .buttonStyle(.borderedProminent) // Standardized style
 
                             Button { showPicker2 = true } label: {
                                 Label("Select Image 2", systemImage: "photo.on.rectangle.angled")
-                                    .padding(.vertical, 6)
+                                    .padding(.vertical, 8) // Standardized padding
                                     .frame(maxWidth: .infinity, alignment: .center)
                             }
-                            .buttonStyle(.bordered)
-                            // .tint(.gray)
+                            .buttonStyle(.borderedProminent) // Standardized style
                         }
 
-                        Section(header: Text("Diptych Settings").foregroundColor(.gray)) {
+                        Section(header: Text("Diptych Settings").foregroundColor(.primary)) { // Adjusted for light theme
                             Picker("Aspect Ratio", selection: $selectedAspectRatio) {
                                 ForEach(AspectRatioOption.allCases) { option in
                                     Text(option.rawValue).tag(option)
                                 }
                             }
-                            // .pickerStyle(.segmented) // Consider for fewer options
+                            // .pickerStyle(.segmented)
                         }
 
-                        Section(header: Text("Frame Settings").foregroundColor(.gray)) {
+                        Section(header: Text("Frame Settings").foregroundColor(.primary)) { // Adjusted for light theme
                             ColorPicker("Frame Color", selection: $frameColor)
+                                .padding(.vertical, 4) // Added padding
                             VStack(alignment: .leading) {
                                 Text("Frame Thickness: \(frameThickness, specifier: "%.0f") pts")
                                 Slider(value: $frameThickness, in: 0...50, step: 1)
                             }
+                            .padding(.vertical, 4) // Added padding
                         }
 
                         // Save Button inside the Form for grouping
@@ -122,31 +123,31 @@ struct ContentView: View {
                             }
                             // .buttonStyle(.borderedProminent) // Removed to use custom styling
                             .disabled(diptychImage == nil)
-                            .listRowInsets(EdgeInsets()) // Attempt to make button background extend to edges if needed
+                            .listRowInsets(EdgeInsets())
                         }
                     }
-                    .frame(maxHeight: 450) // Give Form a reasonable maxHeight; ScrollView handles overflow
-                    .background(Color.black) // Ensure Form background is dark if it defaults otherwise
-                    .scrollContentBackground(.hidden) // For iOS 16+, to make Form background transparent if needed
+                    // .frame(maxHeight: 450) // Removed to allow natural sizing
+                    // .background(Color.black) // Removed for light theme
+                    // .scrollContentBackground(.hidden) // Removed for default Form styling
 
 
                     // 3. Final Diptych Preview
                     Group {
                         Text("Final Diptych Preview:")
-                            .font(.headline) // Make it a bit more prominent
-                            .foregroundColor(.white.opacity(0.8))
+                            .font(.headline)
+                            .foregroundColor(.primary) // Adjusted for light theme
                             .padding(.top)
                         if let diptych = diptychImage {
                             Image(uiImage: diptych)
                                 .resizable()
                                 .scaledToFit()
-                                .frame(maxHeight: 200) // Slightly larger preview if space allows
+                                .frame(maxHeight: 200)
                                 .border(Color.gray, width: 1)
                         } else {
                             Rectangle()
-                                .fill(Color(white: 0.15))
+                                .fill(Color(white: 0.9)) // Adjusted for light theme
                                 .frame(maxWidth: .infinity, maxHeight: 200)
-                                .overlay(Text("Final Diptych").foregroundColor(.white.opacity(0.7)))
+                                .overlay(Text("Final Diptych").foregroundColor(Color(white: 0.4))) // Adjusted for light theme
                                 .border(Color.gray.opacity(0.5))
                         }
                     }
@@ -155,6 +156,7 @@ struct ContentView: View {
                     Spacer() // Pushes content up if ScrollView is not full
                 } // End of Main VStack
                 .padding(.horizontal) // Add horizontal padding to the main VStack content
+                .padding(.top) // Added padding at the top of the ScrollView
             } // End of ScrollView
         } // End of ZStack
         .alert(isPresented: $showSaveConfirmation) {
@@ -253,7 +255,7 @@ private struct InteractiveImageView: View {
                         .offset(x: committedDragOffset.width + currentDragOffset.width,
                                 y: committedDragOffset.height + currentDragOffset.height)
                         .clipped()
-                        .border(isActive ? Color.accentColor : Color.gray, width: isActive ? 2 : 1) // Conditional border
+                        .border(isActive ? Color.accentColor : Color(white: 0.8), width: isActive ? 2 : 1) // Adjusted default border for light theme
                         .contentShape(Rectangle())
                         .gesture(
                             DragGesture()
@@ -287,10 +289,10 @@ private struct InteractiveImageView: View {
                         )
                 } else {
                     Rectangle()
-                        .fill(Color(white: 0.15))
+                        .fill(Color(white: 0.9)) // Adjusted for light theme
                     .frame(width: geometry.size.width, height: geometry.size.height)
-                    .border(Color.gray)
-                    .overlay(Text("Select Image").foregroundColor(.white.opacity(0.7)))
+                    .border(Color(white: 0.8)) // Adjusted for light theme
+                    .overlay(Text("Select Image").foregroundColor(Color(white: 0.4))) // Adjusted for light theme
                 }
 
                 // Reset Button Overlay
@@ -310,8 +312,8 @@ private struct InteractiveImageView: View {
                                 Image(systemName: "arrow.counterclockwise.circle.fill")
                                     .font(.title2)
                                     .foregroundColor(Color.accentColor)
-                                    .padding(6) // Reduced padding
-                                    .background(Color.black.opacity(0.6))
+                                    .padding(6)
+                                    .background(Color.white.opacity(0.75)) // Adjusted for light theme
                                     .clipShape(Circle())
                             }
                             .padding(8) // Padding for the button from the corner
